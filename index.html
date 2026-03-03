@@ -111,12 +111,20 @@
     /* Small helper */
     .hint{ font-size: 12px; opacity: .75; margin-top: 8px; }
     code{ background:#f3f4f6; padding: 2px 6px; border-radius: 6px; }
+    .label {
+    display: block;
+    text-align: left;
+    font-size: var(--font-size-label);
+    font-weight: 600;
+    color: var(--color-label);
+    padding-bottom: 6px;
+}
   </style>
 </head>
 
 <body>
 <div class="form-group">
-    <label class="control-label">Permitted Airports (IATA Codes)</label>
+    <label class="label">Permitted Airports (IATA Codes)</label>
     <input id="autocomplete" class="autocomplete-airport" type="text" />
     <input type="hidden" id="autocomplete_selected" name="autocomplete_selected" value="[]">
   </div>
@@ -403,6 +411,7 @@ $(".autocomplete-wrapper").each(function () {
   </script>
 </body>
 </html>
+
 
 
 
