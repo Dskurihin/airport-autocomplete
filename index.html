@@ -8,52 +8,32 @@
   <!-- Dependencies (CDN) -->
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/underscore@1.13.6/underscore-min.js"></script>
+
+  <!-- Your airports dataset -->
   <script src="https://screenfeedcontent.blob.core.windows.net/html/airports.js"></script>
-  <!-- IMPORTANT: Fuse v2.x to match your original working code/options -->
+
+  <!-- Fuse v2.x to match your original options -->
   <script src="https://unpkg.com/fuse.js@2.5.0/src/fuse.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.16.1/lodash.min.js"></script>
-  
+
   <style>
     body{
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       margin: 24px;
       color: #111827;
     }
+
     .form-group{ margin-bottom: 22px; max-width: 760px; margin-left: -23px; }
-    .control-label{ display:block; margin-bottom: 8px; font-weight: 600; }
 
-    /* Multi container */
-    .airport-multi{
-      border: 1px solid #ddd;
-      padding: 8px;
-      border-radius: 8px;
-      background: #fff;
-    }
-    .airport-multi:focus-within{
-      border-color: #7aa7ff;
-      box-shadow: 0 0 0 3px rgba(122,167,255,.2);
-    }
-    .airport-multi .autocomplete-airport{
-      border: 0;
-      outline: none;
-      min-width: 220px;
-      padding: 6px 4px;
-      border: 1px solid #dbdfe7;
-      border-radius: 6px;
-      width: 100%;
-      font-size: 14px;
-      color: #71747A;
-      background-color: #ffffff;
-      font-weight: 400;
-      padding: 12px;
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
 
+    .ac-wrap { position: relative; }
+
+    /* Input */
     .autocomplete-airport{
-      border: 0;
-      outline: none;
-      min-width: 220px;
-      padding: 6px 4px;
       border: 1px solid #dbdfe7;
       border-radius: 6px;
       width: 99%;
@@ -62,6 +42,7 @@
       background-color: #ffffff;
       font-weight: 400;
       padding: 12px;
+      outline: none;
     }
 
     /* Chips */
@@ -90,8 +71,9 @@
     }
     .airport-chip-remove:hover{ opacity: 1; }
 
-    /* Autocomplete wrapper + results (same structure as your working pen) */
+    /* Results list */
     .autocomplete-wrapper{ position: relative; }
+
     .autocomplete-results{
       position: absolute;
       background: white;
@@ -108,6 +90,7 @@
       max-height: 280px;
       overflow-y: auto;
     }
+
     .autocomplete-result{
       padding: 12px 15px;
       border-bottom: solid 1px #eee;
@@ -116,7 +99,7 @@
     .autocomplete-result:last-child{ border-bottom-width: 0; }
     .autocomplete-location{ opacity: .8; font-size: smaller; margin-top: 3px; }
 
-    /* Highlight (like CodePen example) */
+    /* Highlight (like your original) */
     .autocomplete-results[data-highlight="0"] > :nth-child(1),
     .autocomplete-results[data-highlight="1"] > :nth-child(2),
     .autocomplete-results[data-highlight="2"] > :nth-child(3),
@@ -129,397 +112,240 @@
       border-bottom-color: #26C9FF;
       outline: solid 1px #1bb7ea;
     }
-
-    /* Small helper */
-    .hint{ font-size: 12px; opacity: .75; margin-top: 8px; }
-    code{ background:#f3f4f6; padding: 2px 6px; border-radius: 6px; }
-    .label {
-    display: block;
-    text-align: left;
-    font-size: 14px;
-    font-weight: 600;
-    color: #555555;
-    padding-bottom: 6px;
-}
-    .form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px; /* space between label and field */
-}
-    .ac-wrap {
-  position: relative;
-}
- .form-group, .ac-wrap {
-  overflow: visible !important;
-  max-height: none !important;
-}
-
-
-/* dropdown list */
-.ac-list {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-
-  max-height: 240px;      /* <- controls dropdown height */
-  overflow-y: auto;       /* <- ONLY this scrolls */
-  overflow-x: hidden;
-  overscroll-behavior: contain;
-
-  background: #fff;
-  border: 1px solid #d0d5dd;
-  border-radius: 10px;
-  box-shadow: 0 10px 25px rgba(0,0,0,.10);
-  z-index: 9999;
-}
-
-.ac-item {
-  padding: 10px 12px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.ac-item:hover,
-.ac-item.is-active {
-  background: #f2f4f7;
-}
-
   </style>
 </head>
 
 <body>
-<div class="form-group">
-  <div class="ac-wrap">
+  <div class="form-group">
     <input id="autocomplete" class="autocomplete-airport" type="text" autocomplete="off" />
-    <div id="autocomplete_list" class="ac-list" hidden></div>
+    <!-- this is only for iframe state; parent submission needs a real parent field -->
+    <input type="hidden" id="autocomplete_selected" value="[]">
   </div>
 
-  <input type="hidden" id="autocomplete_selected" name="autocomplete_selected" value="[]">
-</div>
+  <script>
+    // ===================== Fuse config =====================
+    var options = {
+      shouldSort: true,
+      threshold: 0.4,
+      maxPatternLength: 32,
+      keys: [
+        { name: 'iata', weight: 0.5 },
+        { name: 'name', weight: 0.3 },
+        { name: 'city', weight: 0.2 }
+      ]
+    };
+    var fuse = new Fuse(airports, options);
 
-<script>
-  // ------------------------ Fuse ------------------------
-  var options = {
-    shouldSort: true,
-    threshold: 0.4,
-    maxPatternLength: 32,
-    keys: [{
-      name: 'iata',
-      weight: 0.5
-    }, {
-      name: 'name',
-      weight: 0.3
-    }, {
-      name: 'city',
-      weight: 0.2
-    }]
-  };
+    // ===================== Helpers =====================
+    function escapeHtml(s) {
+      return String(s || '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
 
-  var fuse = new Fuse(airports, options);
+    function sameAirport(a, b) {
+      var ai = (a.iata || '').toUpperCase();
+      var bi = (b.iata || '').toUpperCase();
+      if (ai && bi) return ai === bi;
+      return (a.name || '') === (b.name || '') && (a.city || '') === (b.city || '');
+    }
 
-  // ------------------------ NEW: Sync helpers ------------------------
-  // If your parent origin is known, set it for security, e.g.:
-  // const PARENT_ORIGIN = 'https://your-n8n-domain.com';
-  const PARENT_ORIGIN = '*'; // safest to change to exact origin when possible
+    function dispatchValueEvents(el) {
+      if (!el) return;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
 
-  function dispatchValueEvents(el) {
-    if (!el) return;
-    // Native DOM events (work well even if parent uses vanilla listeners)
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  }
+    // ===== IMPORTANT: this writes into an EXISTING parent field =====
+    // You must create a normal n8n field named "autocomplete_selected"
+    // (Text or Textarea). The iframe will set its value.
+    function syncToParent(selectedArray) {
+      var payload = JSON.stringify(selectedArray || []);
+      try {
+        var doc = window.parent.document; // same-origin only
+        var el =
+          doc.querySelector('input[name="autocomplete_selected"]') ||
+          doc.querySelector('textarea[name="autocomplete_selected"]') ||
+          doc.getElementById('autocomplete_selected');
 
-  function syncSelectedToParent(selectedArray) {
-    const payload = JSON.stringify(selectedArray || []);
-
-    // 1) Try same-origin direct write to parent hidden input
-    try {
-      if (window.parent && window.parent !== window) {
-        const parentDoc = window.parent.document; // will throw if cross-origin
-        const parentHidden =
-          parentDoc.getElementById('autocomplete_selected') ||
-          parentDoc.querySelector('input[name="autocomplete_selected"]');
-
-        if (parentHidden) {
-          parentHidden.value = payload;
-          dispatchValueEvents(parentHidden);
+        if (el) {
+          el.value = payload;
+          dispatchValueEvents(el);
         }
+      } catch (e) {
+        // If cross-origin, this won't work without a parent postMessage listener.
       }
-    } catch (e) {
-      // Cross-origin: ignore and fall back to postMessage
     }
 
-    // 2) Always also postMessage (works cross-origin if parent listens)
-    try {
-      window.parent.postMessage(
-        { type: 'autocompleteSelected', value: selectedArray || [] },
-        PARENT_ORIGIN
-      );
-    } catch (e) {
-      // ignore
+    function setIframeHidden(selectedArray) {
+      var hidden = document.getElementById('autocomplete_selected');
+      hidden.value = JSON.stringify(selectedArray || []);
+      dispatchValueEvents(hidden);
     }
-  }
 
-  function setHiddenAndDispatch($hidden, selectedArray) {
-    if (!$hidden || !$hidden.length) return;
-    const payload = JSON.stringify(selectedArray || []);
-    $hidden.val(payload);
+    // ===================== Selected state =====================
+    var selected = []; // array of airport objects
 
-    // dispatch events on the real DOM element
-    dispatchValueEvents($hidden.get(0));
+    function renderChips($ac) {
+      // remove old chips
+      $ac.parent().find('.airport-chip').remove();
 
-    // push to parent too
-    syncSelectedToParent(selectedArray || []);
-  }
+      // render chips before input
+      selected.forEach(function(a, idx) {
+        var label = '<b>' + escapeHtml(a.iata) + '</b>'
+          + (a.name ? ' - ' + escapeHtml(a.name) : '')
+          + (a.city ? ' - ' + escapeHtml(a.city) : '');
 
-  // ------------------------ Multi-select helpers ------------------------
-  function escapeHtml(s) {
-    return String(s || '')
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
+        var $chip = $(
+          '<span class="airport-chip" data-idx="' + idx + '">' +
+            label +
+            ' <button type="button" class="airport-chip-remove" aria-label="Remove">×</button>' +
+          '</span>'
+        );
 
-  function sameAirport(a, b) {
-    var ai = (a.iata || '').toUpperCase();
-    var bi = (b.iata || '').toUpperCase();
-    if (ai && bi) return ai === bi;
-    return (a.name || '') === (b.name || '') && (a.city || '') === (b.city || '');
-  }
+        $chip.find('.airport-chip-remove').on('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          selected.splice(idx, 1);
+          // update hidden + parent + dispatch events
+          setIframeHidden(selected);
+          syncToParent(selected);
+          renderChips($ac);
+          $ac.focus();
+        });
 
-  function getSelected($ac) {
-    var selected = $ac.data('selectedAirports');
-    if (!selected) {
-      selected = [];
-      $ac.data('selectedAirports', selected);
-    }
-    return selected;
-  }
-
-  function getHidden($ac) {
-    var inputId = $ac.attr('id');
-    var $hidden = inputId ? $('#' + inputId + '_selected') : null;
-    if (!$hidden || !$hidden.length) $hidden = $('#autocomplete_selected');
-    return $hidden;
-  }
-
-  function renderChips($ac) {
-    var selected = getSelected($ac);
-    var $container = $ac.closest('.airport-multi');
-    if (!$container.length) $container = $ac.parent();
-
-    $container.find('.airport-chip').remove();
-
-    selected.forEach(function(a, idx) {
-      var label = '<b>' + escapeHtml(a.iata) + '</b>'
-        + (a.name ? ' - ' + escapeHtml(a.name) : '')
-        + (a.city ? ' - ' + escapeHtml(a.city) : '');
-
-      var $chip = $(
-        '<span class="airport-chip" data-idx="' + idx + '">' +
-          label +
-          ' <button type="button" class="airport-chip-remove" aria-label="Remove">×</button>' +
-        '</span>'
-      );
-
-      $chip.find('.airport-chip-remove').on('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        selected.splice(idx, 1);
-
-        // ✅ NEW: update hidden + dispatch + sync to parent
-        setHiddenAndDispatch(getHidden($ac), selected);
-
-        renderChips($ac);
-        $ac.focus();
+        $chip.insertBefore($ac);
       });
 
-      $chip.insertBefore($ac);
-    });
+      // persist after render
+      setIframeHidden(selected);
+      syncToParent(selected);
+    }
 
-    // ✅ NEW: persist + dispatch + sync to parent
-    setHiddenAndDispatch(getHidden($ac), selected);
-  }
+    // ===================== Autocomplete wiring =====================
+    var results = [];
+    var numResults = 0;
+    var selectedIndex = -1;
 
-  // minimal chip CSS (kept)
-  (function injectChipCss(){
-    var css = `
-      .airport-multi { border:1px solid #ddd; padding:8px; border-radius:6px; }
-      .airport-chip { display:inline-flex; align-items:center; gap:8px; padding:6px 10px; margin:0 6px 6px 0;
-        border-radius:999px; background:#f1f5f9; border:1px solid #e2e8f0; font-size:13px; }
-      .airport-chip b{ font-weight:700; }
-      .airport-chip-remove{ border:0; background:transparent; cursor:pointer; font-size:16px; line-height:1; opacity:.7; }
-      .airport-chip-remove:hover{ opacity:1; }
-      .airport-multi .autocomplete-airport{ border:0; outline:none; min-width:160px; }
-    `;
-    var style = document.createElement('style');
-    style.appendChild(document.createTextNode(css));
-    document.head.appendChild(style);
-  })();
+    var $ac = $('#autocomplete');
 
-  // ------------------------ Your existing wiring (kept) ------------------------
-  $('.autocomplete-airport').each(function() {
-    var ac = $(this);
-
-    ac.on('click', function(e) {
-      e.stopPropagation();
-    })
-    .on('focus keyup', search)
-    .on('keydown', onKeyDown);
-
-    var wrap = $('<div>')
+    // wrap input and create results container (matches your original structure)
+    var $wrap = $('<div>')
       .addClass('autocomplete-wrapper')
-      .insertBefore(ac)
-      .append(ac);
+      .insertBefore($ac)
+      .append($ac);
 
-    var list = $('<div>')
-      .addClass('autocomplete-results troll')
+    var $list = $('<div>')
+      .addClass('autocomplete-results')
       .on('click', '.autocomplete-result', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        selectIndex($(this).data('index'), ac);
+        selectIndex($(this).data('index'));
       })
-      .appendTo(wrap);
+      .appendTo($wrap);
 
-    $(".autocomplete-airport").focus(function() {
-      $(ac).toggleClass("yes");
-      $(".autocomplete-result").closest(".autocomplete-results").addClass("in");
-    });
+    $ac
+      .on('click', function(e){ e.stopPropagation(); })
+      .on('focus keyup', search)
+      .on('keydown', onKeyDown);
 
-    var inputId = ac.attr('id');
-    if (inputId && !$('#' + inputId + '_selected').length) {
-      $('<input type="hidden">')
-        .attr('id', inputId + '_selected')
-        .attr('name', inputId + '_selected')
-        .val('[]')
-        .insertAfter(wrap);
-    }
+    $(document).on('click', clearResults);
 
-    renderChips(ac);
-  });
-
-  $(document)
-    .on('mouseover', '.autocomplete-result', function(e) {
-      var index = parseInt($(this).data('index'), 10);
-      if (!isNaN(index)) {
-        $(this).attr('data-highlight', index);
-      }
-    })
-    .on('click', clearResults);
-
-  function clearResults() {
-    results = [];
-    numResults = 0;
-    $('.autocomplete-results').empty();
-  }
-
-  function selectIndex(index, autoinput) {
-    if (results.length >= index + 1 && index >= 0) {
-      var chosen = results[index];
-      var selected = getSelected(autoinput);
-
-      if (!selected.some(function(x) { return sameAirport(x, chosen); })) {
-        selected.push(chosen);
-        renderChips(autoinput); // renderChips will sync + dispatch now
-      }
-
-      autoinput.val('');
-      clearResults();
-    }
-  }
-
-  var results = [];
-  var numResults = 0;
-  var selectedIndex = -1;
-
-  function search(e) {
-    if (e.which === 38 || e.which === 13 || e.which === 40) return;
-
-    var ac = $(e.target);
-    var list = ac.next();
-
-    if (ac.val().length > 0) {
-      results = _.take(fuse.search(ac.val()), 7);
-
-      var selected = getSelected(ac);
-      results = results.filter(function(r) {
-        return !selected.some(function(s) { return sameAirport(s, r); });
-      });
-
-      numResults = results.length;
-
-      var divs = results.map(function(r, i) {
-        return '<div class="autocomplete-result" data-index="'+ i +'">'
-             + '<div><b>'+ escapeHtml(r.iata) +'</b> - '+ escapeHtml(r.name) +'</div>'
-             + '<div class="autocomplete-location">'+ escapeHtml(r.city) +', '+ escapeHtml(r.country) +'</div>'
-             + '</div>';
-      });
-
-      selectedIndex = -1;
-      list.html(divs.join(''))
-        .attr('data-highlight', selectedIndex);
-
-    } else {
+    function clearResults() {
+      results = [];
       numResults = 0;
-      list.empty();
+      $list.empty();
+      selectedIndex = -1;
+      $list.attr('data-highlight', selectedIndex);
     }
-  }
 
-  function onKeyDown(e) {
-    var ac = $(e.currentTarget);
-    var list = ac.next();
+    function selectIndex(index) {
+      if (results.length >= index + 1 && index >= 0) {
+        var chosen = results[index];
 
-    switch (e.which) {
-      case 38:
-        selectedIndex--;
-        if (selectedIndex <= -1) selectedIndex = -1;
-        list.attr('data-highlight', selectedIndex);
-        break;
-
-      case 13:
-        selectIndex(selectedIndex, ac);
-        break;
-
-      case 9:
-        selectIndex(selectedIndex, ac);
-        e.stopPropagation();
-        return;
-
-      case 40:
-        selectedIndex++;
-        if (selectedIndex >= numResults) selectedIndex = numResults - 1;
-        list.attr('data-highlight', selectedIndex);
-        break;
-
-      case 8:
-        if (!ac.val()) {
-          var selected = getSelected(ac);
-          if (selected.length) {
-            selected.pop();
-            renderChips(ac); // will sync + dispatch now
-          }
+        // avoid duplicates
+        if (!selected.some(function(x){ return sameAirport(x, chosen); })) {
+          selected.push(chosen);
+          renderChips($ac);
         }
-        return;
 
-      default:
-        return;
+        $ac.val('');
+        clearResults();
+      }
     }
 
-    e.stopPropagation();
-    e.preventDefault();
-  }
+    function search(e) {
+      if (e.which === 38 || e.which === 13 || e.which === 40) return;
 
-  var counter = 0;
-  $(".autocomplete-wrapper").each(function () {
-    counter++;
-    var self = $(this);
-    self.addClass("row_" + counter);
-    self.find('.autocomplete-results').each(function () {
-      $(".autocomplete-wrapper").find(".autocomplete-results").addClass("intro");
-    });
-  });
-</script>
+      var q = $ac.val();
+      if (q && q.length > 0) {
+        results = _.take(fuse.search(q), 7);
+
+        // filter out already selected
+        results = results.filter(function(r) {
+          return !selected.some(function(s){ return sameAirport(s, r); });
+        });
+
+        numResults = results.length;
+
+        var html = results.map(function(r, i) {
+          return '<div class="autocomplete-result" data-index="'+ i +'">' +
+                   '<div><b>'+ escapeHtml(r.iata) +'</b> - '+ escapeHtml(r.name) +'</div>' +
+                   '<div class="autocomplete-location">'+ escapeHtml(r.city) +', '+ escapeHtml(r.country) +'</div>' +
+                 '</div>';
+        }).join('');
+
+        selectedIndex = -1;
+        $list.html(html).attr('data-highlight', selectedIndex);
+      } else {
+        clearResults();
+      }
+    }
+
+    function onKeyDown(e) {
+      switch (e.which) {
+        case 38: // up
+          selectedIndex--;
+          if (selectedIndex <= -1) selectedIndex = -1;
+          $list.attr('data-highlight', selectedIndex);
+          break;
+
+        case 13: // enter
+          selectIndex(selectedIndex);
+          break;
+
+        case 9: // tab
+          selectIndex(selectedIndex);
+          e.stopPropagation();
+          return;
+
+        case 40: // down
+          selectedIndex++;
+          if (selectedIndex >= numResults) selectedIndex = numResults - 1;
+          $list.attr('data-highlight', selectedIndex);
+          break;
+
+        case 8: // backspace removes last chip if input empty
+          if (!$ac.val()) {
+            if (selected.length) {
+              selected.pop();
+              setIframeHidden(selected);
+              syncToParent(selected);
+              renderChips($ac);
+            }
+          }
+          return;
+
+        default:
+          return;
+      }
+      e.stopPropagation();
+      e.preventDefault();
+    }
+
+    // initial
+    renderChips($ac);
+  </script>
 </body>
 </html>
