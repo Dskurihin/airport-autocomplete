@@ -130,281 +130,286 @@
   <script>
     // ------------------------ API CONFIG ------------------------
     // Change these if you use another API endpoint/parameter
-    var AIRPORTS_API_BASE = "https://airportsapi.com/api/airports";
-    var API_SEARCH_PARAM = "search";
-    var MIN_LEN = 2;
-    var MAX_SHOW = 7;
+   var options = {
+  shouldSort: true,
+  threshold: 0.4,
+  maxPatternLength: 32,
+  keys: [{
+    name: 'iata',
+    weight: 0.5
+  }, {
+    name: 'name',
+    weight: 0.3
+  }, {
+    name: 'city',
+    weight: 0.2
+  }]
+};
 
-    function fetchAirportsFromApi(q) {
-      var url = AIRPORTS_API_BASE + "?" + encodeURIComponent(API_SEARCH_PARAM) + "=" + encodeURIComponent(q);
-      return fetch(url, { headers: { "Accept": "application/json" } })
-        .then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-        .then(function(data){
-          var arr = Array.isArray(data) ? data : (data.data || data.airports || []);
-          return arr.map(function(a){
-            return {
-              iata: String(a.iata || a.iata_code || a.iataCode || "").toUpperCase(),
-              name: a.name || a.airport_name || a.airportName || "",
-              city: a.city || a.municipality || "",
-              country: a.country || a.country_name || a.countryName || ""
-            };
-          }).filter(function(x){ return x.iata || x.name; });
-        });
-    }
+var fuse = new Fuse(airports, options);
 
-    // ------------------------ FUSE (matches your working example) ------------------------
-    var options = {
-      shouldSort: true,
-      threshold: 0.4,
-      maxPatternLength: 32,
-      keys: [{
-        name: 'iata',
-        weight: 0.5
-      }, {
-        name: 'name',
-        weight: 0.3
-      }, {
-        name: 'city',
-        weight: 0.2
-      }]
-    };
+// ---- Multi-select helpers ----
+function escapeHtml(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
-    var airports = [];
-    var fuse = new Fuse(airports, options);
+function sameAirport(a, b) {
+  var ai = (a.iata || '').toUpperCase();
+  var bi = (b.iata || '').toUpperCase();
+  if (ai && bi) return ai === bi;
+  return (a.name || '') === (b.name || '') && (a.city || '') === (b.city || '');
+}
 
-    // Global state (same pattern as your original code)
-    var results = [];
-    var numResults = 0;
-    var selectedIndex = -1;
+function getSelected($ac) {
+  // store selected array on the input element itself
+  var selected = $ac.data('selectedAirports');
+  if (!selected) {
+    selected = [];
+    $ac.data('selectedAirports', selected);
+  }
+  return selected;
+}
 
-    // Request sequencing to avoid old API responses overwriting newer search
-    var requestSeq = 0;
+function getHidden($ac) {
+  // default hidden field: #<inputId>_selected, fallback to #autocomplete_selected
+  var inputId = $ac.attr('id');
+  var $hidden = inputId ? $('#' + inputId + '_selected') : null;
+  if (!$hidden || !$hidden.length) $hidden = $('#autocomplete_selected');
+  return $hidden;
+}
 
-    // ------------------------ Multi-select helpers ------------------------
-    function escapeHtml(s) {
-      return String(s || '')
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-    }
+function renderChips($ac) {
+  var selected = getSelected($ac);
+  var $container = $ac.closest('.airport-multi');
+  if (!$container.length) $container = $ac.parent();
 
-    function sameAirport(a, b) {
-      var ai = (a.iata || '').toUpperCase();
-      var bi = (b.iata || '').toUpperCase();
-      if (ai && bi) return ai === bi;
-      return (a.name || '') === (b.name || '') && (a.city || '') === (b.city || '');
-    }
+  // remove old chips
+  $container.find('.airport-chip').remove();
 
-    function getSelected($ac) {
-      var selected = $ac.data('selectedAirports');
-      if (!selected) {
-        selected = [];
-        $ac.data('selectedAirports', selected);
-      }
-      return selected;
-    }
+  // render chips before input
+  selected.forEach(function(a, idx) {
+    var label = '<b>' + escapeHtml(a.iata) + '</b>'
+      + (a.name ? ' - ' + escapeHtml(a.name) : '')
+      + (a.city ? ' - ' + escapeHtml(a.city) : '');
 
-    function getHidden($ac) {
-      // default hidden for this demo
-      return $('#autocomplete_selected');
-    }
+    var $chip = $(
+      '<span class="airport-chip" data-idx="' + idx + '">' +
+        label +
+        ' <button type="button" class="airport-chip-remove" aria-label="Remove">×</button>' +
+      '</span>'
+    );
 
-    function renderChips($ac) {
-      var selected = getSelected($ac);
-      var $container = $ac.closest('.airport-multi');
-      if (!$container.length) $container = $ac.parent();
-
-      // Remove old chips
-      $container.find('.airport-chip').remove();
-
-      // Render chips before input
-      selected.forEach(function(a, idx) {
-        var label = '<b>' + escapeHtml(a.iata) + '</b>'
-          + (a.name ? ' - ' + escapeHtml(a.name) : '')
-          + (a.city ? ' - ' + escapeHtml(a.city) : '');
-
-        var $chip = $(
-          '<span class="airport-chip" data-idx="' + idx + '">' +
-            label +
-            ' <button type="button" class="airport-chip-remove" aria-label="Remove">×</button>' +
-          '</span>'
-        );
-
-        $chip.find('.airport-chip-remove').on('click', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          selected.splice(idx, 1);
-          getHidden($ac).val(JSON.stringify(selected));
-          renderChips($ac);
-          $ac.focus();
-        });
-
-        $chip.insertBefore($ac);
-      });
-
+    $chip.find('.airport-chip-remove').on('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      selected.splice(idx, 1);
       getHidden($ac).val(JSON.stringify(selected));
-    }
-
-    // ------------------------ Your original wiring (kept) ------------------------
-    $('.autocomplete-airport').each(function() {
-      var ac = $(this);
-
-      ac.on('click', function(e) { e.stopPropagation(); })
-        .on('focus keyup', search)
-        .on('keydown', onKeyDown);
-
-      // Wrap input + results exactly like the working example
-      var wrap = $('<div>')
-        .addClass('autocomplete-wrapper')
-        .insertBefore(ac)
-        .append(ac);
-
-      var list = $('<div>')
-        .addClass('autocomplete-results troll')
-        .on('click', '.autocomplete-result', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          selectIndex($(this).data('index'), ac);
-        })
-        .appendTo(wrap);
-
-      // init
-      renderChips(ac);
+      renderChips($ac);
+      $ac.focus();
     });
 
-    $(document)
-      .on('mouseover', '.autocomplete-result', function(e) {
-        var index = parseInt($(this).data('index'), 10);
-        if (!isNaN(index)) {
-          $(this).attr('data-highlight', index);
-        }
-      })
-      .on('click', clearResults);
+    $chip.insertBefore($ac);
+  });
 
-    function clearResults() {
-      results = [];
-      numResults = 0;
-      $('.autocomplete-results').empty();
-    }
+  // persist selected list
+  getHidden($ac).val(JSON.stringify(selected));
+}
 
-    // MULTISELECT: add a chip instead of setting input value
-    function selectIndex(index, autoinput) {
-      if (results.length >= index + 1 && index >= 0) {
-        var chosen = results[index];
-        var selected = getSelected(autoinput);
+// minimal chip CSS (optional; add to your CSS file)
+(function injectChipCss(){
+  var css = `
+    .airport-multi { border:1px solid #ddd; padding:8px; border-radius:6px; }
+    .airport-chip { display:inline-flex; align-items:center; gap:8px; padding:6px 10px; margin:0 6px 6px 0;
+      border-radius:999px; background:#f1f5f9; border:1px solid #e2e8f0; font-size:13px; }
+    .airport-chip b{ font-weight:700; }
+    .airport-chip-remove{ border:0; background:transparent; cursor:pointer; font-size:16px; line-height:1; opacity:.7; }
+    .airport-chip-remove:hover{ opacity:1; }
+    .airport-multi .autocomplete-airport{ border:0; outline:none; min-width:160px; }
+  `;
+  var style = document.createElement('style');
+  style.appendChild(document.createTextNode(css));
+  document.head.appendChild(style);
+})();
 
-        if (!selected.some(function(x){ return sameAirport(x, chosen); })) {
-          selected.push(chosen);
-          renderChips(autoinput);
-        }
+// ---- Your existing wiring (kept) ----
+$('.autocomplete-airport').each(function() {
+  var ac = $(this);
 
-        autoinput.val('');
-        clearResults();
-      }
-    }
+  ac.on('click', function(e) {
+    e.stopPropagation();
+  })
+  .on('focus keyup', search)
+  .on('keydown', onKeyDown);
 
-    // Search: same as original, but refresh airports/fuse from API first
-    function search(e) {
-      if (e.which === 38 || e.which === 13 || e.which === 40) return;
+  // ensure we have a wrapper (your code did this; we keep it)
+  var wrap = $('<div>')
+    .addClass('autocomplete-wrapper')
+    .insertBefore(ac)
+    .append(ac);
 
-      var ac = $(e.target);
-      var list = ac.next(); // IMPORTANT: same assumption as your working code
-      var q = ac.val();
-
-      if (!q || q.length < MIN_LEN) {
-        numResults = 0;
-        list.empty();
-        return;
-      }
-
-      // lightweight loading
-      list.html('<div class="autocomplete-result" data-index="0"><div><b>…</b> Loading</div></div>');
-
-      var mySeq = ++requestSeq;
-
-      fetchAirportsFromApi(q).then(function(apiAirports){
-        if (mySeq !== requestSeq) return;
-
-        airports = apiAirports;
-        fuse = new Fuse(airports, options);
-
-        // Same as your original: fuse.search returns items directly (Fuse v2.x)
-        results = _.take(fuse.search(q), MAX_SHOW);
-
-        // Filter out already-selected items
-        var selected = getSelected(ac);
-        results = results.filter(function(r){
-          return !selected.some(function(s){ return sameAirport(s, r); });
-        });
-
-        numResults = results.length;
-
-        var divs = results.map(function(r, i) {
-          return '<div class="autocomplete-result" data-index="'+ i +'">'
-               + '<div><b>'+ escapeHtml(r.iata) +'</b> - '+ escapeHtml(r.name) +'</div>'
-               + '<div class="autocomplete-location">'+ escapeHtml(r.city) + (r.country ? ', ' + escapeHtml(r.country) : '') +'</div>'
-               + '</div>';
-        });
-
-        selectedIndex = -1;
-        list.html(divs.join(''))
-          .attr('data-highlight', selectedIndex);
-
-        if (numResults === 0) {
-          list.html('<div class="autocomplete-result"><div>No matches</div></div>');
-        }
-      }).catch(function(){
-        if (mySeq !== requestSeq) return;
-        list.html('<div class="autocomplete-result"><div><b>!</b> API error</div></div>');
-      });
-    }
-
-    function onKeyDown(e) {
-      var ac = $(e.currentTarget);
-      var list = ac.next();
-
-      switch(e.which) {
-        case 38: // up
-          selectedIndex--;
-          if (selectedIndex <= -1) selectedIndex = -1;
-          list.attr('data-highlight', selectedIndex);
-          break;
-
-        case 13: // enter
-          selectIndex(selectedIndex, ac);
-          break;
-
-        case 9: // tab
-          selectIndex(selectedIndex, ac);
-          e.stopPropagation();
-          return;
-
-        case 40: // down
-          selectedIndex++;
-          if (selectedIndex >= numResults) selectedIndex = numResults - 1;
-          list.attr('data-highlight', selectedIndex);
-          break;
-
-        case 8: // backspace => remove last chip if input empty
-          if (!ac.val()) {
-            var selected = getSelected(ac);
-            if (selected.length) {
-              selected.pop();
-              renderChips(ac);
-            }
-          }
-          return;
-
-        default:
-          return;
-      }
-
-      e.stopPropagation();
+  var list = $('<div>')
+    .addClass('autocomplete-results troll')
+    .on('click', '.autocomplete-result', function(e) {
       e.preventDefault();
+      e.stopPropagation();
+      selectIndex($(this).data('index'), ac);
+    })
+    .appendTo(wrap);
+
+  // keep your focus behavior
+  $(".autocomplete-airport").focus(function() {
+    $(ac).toggleClass("yes");
+    $(".autocomplete-result").closest(".autocomplete-results").addClass("in");
+  });
+
+  // init hidden field if not present
+  var inputId = ac.attr('id');
+  if (inputId && !$('#' + inputId + '_selected').length) {
+    // create a per-input hidden if you prefer
+    $('<input type="hidden">')
+      .attr('id', inputId + '_selected')
+      .attr('name', inputId + '_selected')
+      .val('[]')
+      .insertAfter(wrap);
+  }
+
+  // initial render
+  renderChips(ac);
+});
+
+$(document)
+  .on('mouseover', '.autocomplete-result', function(e) {
+    var index = parseInt($(this).data('index'), 10);
+    if (!isNaN(index)) {
+      $(this).attr('data-highlight', index);
     }
+  })
+  .on('click', clearResults);
+
+function clearResults() {
+  results = [];
+  numResults = 0;
+  $('.autocomplete-results').empty();
+}
+
+// ---- CHANGED: selectIndex now ADDS a chip instead of setting input value ----
+function selectIndex(index, autoinput) {
+  if (results.length >= index + 1 && index >= 0) {
+    var chosen = results[index];
+
+    var selected = getSelected(autoinput);
+
+    // avoid duplicates
+    if (!selected.some(function(x) { return sameAirport(x, chosen); })) {
+      selected.push(chosen);
+      renderChips(autoinput);
+    }
+
+    // keep typing
+    autoinput.val('');
+    clearResults();
+  }
+}
+
+var results = [];
+var numResults = 0;
+var selectedIndex = -1;
+
+function search(e) {
+  if (e.which === 38 || e.which === 13 || e.which === 40) return;
+
+  var ac = $(e.target);
+  var list = ac.next();
+
+  if (ac.val().length > 0) {
+    results = _.take(fuse.search(ac.val()), 7);
+
+    // filter out already-selected items for this input
+    var selected = getSelected(ac);
+    results = results.filter(function(r) {
+      return !selected.some(function(s) { return sameAirport(s, r); });
+    });
+
+    numResults = results.length;
+
+    var divs = results.map(function(r, i) {
+      return '<div class="autocomplete-result" data-index="'+ i +'">'
+           + '<div><b>'+ escapeHtml(r.iata) +'</b> - '+ escapeHtml(r.name) +'</div>'
+           + '<div class="autocomplete-location">'+ escapeHtml(r.city) +', '+ escapeHtml(r.country) +'</div>'
+           + '</div>';
+    });
+
+    selectedIndex = -1;
+    list.html(divs.join(''))
+      .attr('data-highlight', selectedIndex);
+
+  } else {
+    numResults = 0;
+    list.empty();
+  }
+}
+
+function onKeyDown(e) {
+  var ac = $(e.currentTarget);
+  var list = ac.next();
+
+  switch (e.which) {
+    case 38: // up
+      selectedIndex--;
+      if (selectedIndex <= -1) selectedIndex = -1;
+      list.attr('data-highlight', selectedIndex);
+      break;
+
+    case 13: // enter
+      selectIndex(selectedIndex, ac);
+      break;
+
+    case 9: // tab
+      selectIndex(selectedIndex, ac);
+      e.stopPropagation();
+      return;
+
+    case 40: // down
+      selectedIndex++;
+      if (selectedIndex >= numResults) selectedIndex = numResults - 1;
+      list.attr('data-highlight', selectedIndex);
+      break;
+
+    case 8: // backspace => remove last chip if input empty
+      if (!ac.val()) {
+        var selected = getSelected(ac);
+        if (selected.length) {
+          selected.pop();
+          renderChips(ac);
+        }
+      }
+      return; // allow normal backspace when not empty
+
+    default:
+      return;
+  }
+
+  e.stopPropagation();
+  e.preventDefault();
+}
+
+// your existing counter code (kept, harmless)
+var counter = 0;
+$(".autocomplete-wrapper").each(function () {
+  counter++;
+  var self = $(this);
+  self.addClass("row_" + counter);
+  self.find('.autocomplete-results').each(function () {
+    $(".autocomplete-wrapper").find(".autocomplete-results").addClass("intro");
+  });
+});
   </script>
 </body>
 </html>
+
 
 
 
