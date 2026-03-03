@@ -149,6 +149,11 @@
     .ac-wrap {
   position: relative;
 }
+ .form-group, .ac-wrap {
+  overflow: visible !important;
+  max-height: none !important;
+}
+
 
 /* dropdown list */
 .ac-list {
@@ -160,6 +165,7 @@
   max-height: 240px;      /* <- controls dropdown height */
   overflow-y: auto;       /* <- ONLY this scrolls */
   overflow-x: hidden;
+  overscroll-behavior: contain;
 
   background: #fff;
   border: 1px solid #d0d5dd;
@@ -476,6 +482,7 @@ $(".autocomplete-wrapper").each(function () {
   </script>
 </body>
 </html>
+
 
 
 
