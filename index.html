@@ -141,15 +141,58 @@
     color: #555555;
     padding-bottom: 6px;
 }
+    .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px; /* space between label and field */
+}
+    .ac-wrap {
+  position: relative;
+}
+
+/* dropdown list */
+.ac-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+
+  max-height: 240px;      /* <- controls dropdown height */
+  overflow-y: auto;       /* <- ONLY this scrolls */
+  overflow-x: hidden;
+
+  background: #fff;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px rgba(0,0,0,.10);
+  z-index: 9999;
+}
+
+.ac-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ac-item:hover,
+.ac-item.is-active {
+  background: #f2f4f7;
+}
+
   </style>
 </head>
 
 <body>
 <div class="form-group">
-    <label class="label">Permitted Airports (IATA Codes)</label>
-    <input id="autocomplete" class="autocomplete-airport" type="text" />
-    <input type="hidden" id="autocomplete_selected" name="autocomplete_selected" value="[]">
+  <label class="label" for="autocomplete">Permitted Airports (IATA Codes)</label>
+
+  <div class="ac-wrap">
+    <input id="autocomplete" class="autocomplete-airport" type="text" autocomplete="off" />
+    <div id="autocomplete_list" class="ac-list" hidden></div>
   </div>
+
+  <input type="hidden" id="autocomplete_selected" name="autocomplete_selected" value="[]">
+</div>
 
   <script>
     // ------------------------ API CONFIG ------------------------
@@ -433,6 +476,7 @@ $(".autocomplete-wrapper").each(function () {
   </script>
 </body>
 </html>
+
 
 
 
