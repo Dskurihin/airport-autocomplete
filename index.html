@@ -115,15 +115,9 @@
 </head>
 
 <body>
-  <div class="form-group">
-    <label class="control-label">Enter Airport(s)</label>
-
-    <!-- Multi-select container -->
-    <div class="airport-multi" id="airportMulti_1">
-      <input id="autocomplete" class="autocomplete-airport" type="text" placeholder="Type airport name or IATA…" autocomplete="off" />
-    </div>
-
-    <!-- Selected list as JSON -->
+<div class="form-group">
+    <label class="control-label">Enter an Airport</label>
+    <input id="autocomplete" class="autocomplete-airport" type="text" />
     <input type="hidden" id="autocomplete_selected" name="autocomplete_selected" value="[]">
   </div>
 
@@ -409,6 +403,7 @@ $(".autocomplete-wrapper").each(function () {
   </script>
 </body>
 </html>
+
 
 
 
